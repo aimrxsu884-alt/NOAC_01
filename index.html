@@ -1,38 +1,282 @@
-
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NOAC Smart Guard</title>
+    <title>NOAC Smart Guard - Clinical Decision Support</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-      body { 
-        font-family: 'Plus Jakarta Sans', sans-serif; 
-        font-size: 16px; /* Increased base font size */
-      }
-      .vibrant-gradient {
-        background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-      }
-      .glass-card {
-        background: rgba(255, 255, 255, 0.8);
-        backdrop-filter: blur(10px);
-      }
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+        body { font-family: 'Sarabun', sans-serif; background-color: #f8fafc; }
+        .step-card { display: none; }
+        .step-card.active { display: block; animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .vibrant-gradient { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); }
     </style>
-<script type="importmap">
-{
-  "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.38.0"
-  }
-}
-</script>
 </head>
-<body class="bg-indigo-50/50 text-slate-900 min-h-screen">
-    <div id="root"></div>
+<body class="pb-10">
+    <div class="max-w-md mx-auto p-4">
+        <header class="vibrant-gradient text-white p-6 rounded-3xl shadow-xl mb-6 text-center">
+            <h1 class="text-2xl font-bold">NOAC Smart Guard</h1>
+            <p class="text-sm opacity-80">ระบบช่วยตัดสินใจขนาดทางการแพทย์</p>
+        </header>
+
+        <div id="setup-container">
+            <div id="step1" class="step-card active bg-white p-6 rounded-3xl shadow-md border border-indigo-50">
+                <h2 class="font-bold mb-4 text-indigo-600"><span class="bg-indigo-100 px-2 py-1 rounded-lg mr-2">1</span>ข้อมูลพื้นฐานและ CrCl</h2>
+                <div class="space-y-3">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 mb-1">เพศ</label>
+                            <select id="gender" class="w-full p-2 rounded-xl bg-slate-50 border border-slate-200">
+                                <option value="male">ชาย</option>
+                                <option value="female">หญิง</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 mb-1">อายุ (ปี)</label>
+                            <input type="number" id="age" class="w-full p-2 rounded-xl bg-slate-50 border border-slate-200">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 mb-1">น้ำหนัก (kg)</label>
+                            <input type="number" id="weight" class="w-full p-2 rounded-xl bg-slate-50 border border-slate-200">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 mb-1">sCr (mg/dL)</label>
+                            <input type="number" id="scr" step="0.1" class="w-full p-2 rounded-xl bg-slate-50 border border-slate-200">
+                        </div>
+                    </div>
+                    <button onclick="calcCrCl()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl mt-2 shadow-lg">ถัดไป</button>
+                </div>
+            </div>
+
+            <div id="step2" class="step-card bg-white p-6 rounded-3xl shadow-md border border-indigo-50">
+                <h2 class="font-bold mb-4 text-indigo-600"><span class="bg-indigo-100 px-2 py-1 rounded-lg mr-2">2</span>ข้อบ่งชี้ (Indication)</h2>
+                <div class="space-y-4">
+                    <select id="indication" onchange="checkAFType()" class="w-full p-3 rounded-xl bg-slate-50 border border-slate-200">
+                        <option value="">เลือกข้อบ่งชี้...</option>
+                        <option value="AF">Atrial Fibrillation (AF)</option>
+                        <option value="VTE">VTE (DVT/PE)</option>
+                    </select>
+                    <div id="af-extra" class="hidden p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                        <p class="text-xs font-bold text-amber-700 mb-2">เป็น Mechanical prosthetic valve / Moderate-Severe Mitral Stenosis หรือไม่?</p>
+                        <div class="flex gap-2">
+                            <button onclick="handleAFValve(true)" class="flex-1 bg-white border border-amber-200 py-2 rounded-xl text-sm">ใช่</button>
+                            <button onclick="handleAFValve(false)" class="flex-1 bg-white border border-amber-200 py-2 rounded-xl text-sm">ไม่ใช่</button>
+                        </div>
+                    </div>
+                    <button id="btn-step2" onclick="goStep(3)" class="hidden w-full bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg">ถัดไป</button>
+                </div>
+            </div>
+
+            <div id="step3" class="step-card bg-white p-6 rounded-3xl shadow-md border border-indigo-50">
+                <h2 class="font-bold mb-4 text-indigo-600"><span class="bg-indigo-100 px-2 py-1 rounded-lg mr-2">3</span>เลือกยา NOAC</h2>
+                <select id="drug" class="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 mb-4">
+                    <option value="dabigatran">Dabigatran</option>
+                    <option value="rivaroxaban">Rivaroxaban</option>
+                    <option value="edoxaban">Edoxaban</option>
+                    <option value="apixaban">Apixaban</option>
+                </select>
+                <button onclick="goStep(4)" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg">ถัดไป</button>
+            </div>
+
+            <div id="step4" class="step-card bg-white p-6 rounded-3xl shadow-md border border-indigo-50">
+                <h2 class="font-bold mb-4 text-indigo-600"><span class="bg-indigo-100 px-2 py-1 rounded-lg mr-2">4-5</span>ปัจจัยร่วม</h2>
+                <div class="space-y-4 text-sm">
+                    <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                        <span>ใช้ร่วมกับ Strong P-gp inhibitor?</span>
+                        <input type="checkbox" id="pgp" class="w-5 h-5">
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                        <span>ใช้ร่วมกับ Verapamil?</span>
+                        <input type="checkbox" id="verapamil" class="w-5 h-5">
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                        <span>ใช้ร่วมกับ Antiplatelets?</span>
+                        <input type="checkbox" id="antiplatelet" class="w-5 h-5">
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                        <span>ใส่สาย NG tube?</span>
+                        <input type="checkbox" id="ngtube" class="w-5 h-5">
+                    </div>
+                    <button onclick="processFinal()" class="w-full vibrant-gradient text-white font-bold py-4 rounded-2xl shadow-xl mt-4">ประมวลผลสรุป</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="result-page" class="hidden space-y-4">
+            <div class="bg-white p-6 rounded-3xl shadow-md border border-indigo-100 text-center">
+                <p class="text-xs text-slate-400 font-bold uppercase mb-2">CrCl ประมวลผลได้</p>
+                <p id="final-crcl" class="text-3xl font-black text-indigo-600 mb-4">0.00</p>
+                
+                <div id="main-recommendation" class="p-6 rounded-2xl mb-4">
+                    <h2 id="final-status" class="text-xl font-bold mb-2"></h2>
+                    <p id="final-dose" class="text-2xl font-black mb-2"></p>
+                    <p id="final-remark" class="text-sm opacity-90"></p>
+                </div>
+            </div>
+
+            <div id="alternatives" class="bg-slate-800 text-white p-6 rounded-3xl shadow-xl">
+                <h3 class="font-bold mb-4 flex items-center"><i class="fas fa-exchange-alt mr-2 text-indigo-400"></i> Alternative NOACs</h3>
+                <div id="alt-list" class="space-y-3"></div>
+            </div>
+            
+            <button onclick="location.reload()" class="w-full py-3 text-slate-500 font-bold">เริ่มใหม่</button>
+        </div>
+    </div>
+
+    <script>
+        let userData = { crcl: 0 };
+
+        function goStep(n) {
+            document.querySelectorAll('.step-card').forEach(c => c.classList.remove('active'));
+            document.getElementById('step' + n).classList.add('active');
+        }
+
+        function calcCrCl() {
+            const age = parseFloat(document.getElementById('age').value);
+            const w = parseFloat(document.getElementById('weight').value);
+            const scr = parseFloat(document.getElementById('scr').value);
+            const gender = document.getElementById('gender').value;
+
+            if(!age || !w || !scr) return alert("กรุณากรอกข้อมูลให้ครบ");
+
+            // Cockcroft-Gault Equation
+            let crcl = ((140 - age) * w) / (72 * scr);
+            if (gender === 'female') crcl *= 0.85;
+            
+            userData.crcl = crcl;
+            userData.age = age;
+            userData.weight = w;
+            userData.scr = scr;
+            
+            goStep(2);
+        }
+
+        function checkAFType() {
+            const ind = document.getElementById('indication').value;
+            const afExtra = document.getElementById('af-extra');
+            const btn = document.getElementById('btn-step2');
+            
+            if(ind === 'AF') {
+                afExtra.classList.remove('hidden');
+                btn.classList.add('hidden');
+            } else if(ind === 'VTE') {
+                afExtra.classList.add('hidden');
+                btn.classList.remove('hidden');
+            }
+        }
+
+        function handleAFValve(isValve) {
+            if(isValve) {
+                showContraindicated("ไม่แนะนำใช้ NOAC พิจารณา warfarin แทน");
+            } else {
+                goStep(3);
+            }
+        }
+
+        function showContraindicated(msg) {
+            document.getElementById('setup-container').classList.add('hidden');
+            document.getElementById('result-page').classList.remove('hidden');
+            document.getElementById('main-recommendation').className = "p-6 rounded-2xl mb-4 bg-rose-500 text-white";
+            document.getElementById('final-status').innerText = "คำแนะนำ";
+            document.getElementById('final-dose').innerText = "ห้ามใช้ (Contraindicated)";
+            document.getElementById('final-remark').innerText = msg;
+            document.getElementById('alternatives').classList.add('hidden');
+        }
+
+        function processFinal() {
+            const drug = document.getElementById('drug').value;
+            const ind = document.getElementById('indication').value;
+            const pgp = document.getElementById('pgp').checked;
+            const vera = document.getElementById('verapamil').checked;
+            const antiplat = document.getElementById('antiplatelet').checked;
+            const ng = document.getElementById('ngtube').checked;
+
+            document.getElementById('setup-container').classList.add('hidden');
+            document.getElementById('result-page').classList.remove('hidden');
+            document.getElementById('final-crcl').innerText = userData.crcl.toFixed(2);
+
+            const result = getDoseInfo(drug, ind, userData.crcl, userData.age, userData.weight, userData.scr, pgp, vera, antiplat, ng);
+            
+            renderMainResult(result);
+            renderAlternatives(drug, ind, userData.crcl, userData.age, userData.weight, userData.scr, pgp, vera, antiplat, ng);
+        }
+
+        function getDoseInfo(drug, ind, crcl, age, weight, scr, pgp, vera, antiplat, ng) {
+            if (crcl < 15) return { status: 'ห้ามใช้', dose: 'Contraindicated', color: 'bg-rose-500', remark: 'ไม่แนะนำให้ใช้ในกลุ่มนี้ +/- ตามดุลพินิจของแพทย์' };
+
+            if (drug === 'dabigatran') {
+                if (crcl < 30) return { status: 'ไม่แนะนำ', dose: 'หลีกเลี่ยง Dabigatran', color: 'bg-rose-500', remark: 'CrCl < 30 ml/min ไม่แนะนำ' };
+                if (ng) return { status: 'ไม่แนะนำ', dose: 'หลีกเลี่ยง Dabigatran', color: 'bg-rose-500', remark: 'ห้ามใช้ในผู้ป่วยใส่สาย NG tube' };
+                
+                let riskFactors = 0;
+                if (age >= 80) riskFactors++;
+                if (vera) riskFactors++;
+                if (antiplat) riskFactors++;
+                
+                let dose = riskFactors >= 1 ? "110 mg BID" : "150 mg BID";
+                let remark = ind === 'VTE' ? "แนะนำ Heparin/enoxaparin 5-10 วัน ก่อนเริ่มยา" : "เหมาะสมตามเกณฑ์ความเสี่ยง";
+                return { status: 'เหมาะสม', dose: dose, color: 'bg-emerald-500', remark: remark };
+            }
+
+            if (drug === 'rivaroxaban') {
+                if (crcl < 15) return { status: 'ไม่แนะนำ', dose: 'หลีกเลี่ยง', color: 'bg-rose-500' };
+                if (ind === 'VTE') return { status: 'เหมาะสม', dose: '15 mg BID (21 วัน) → 20 mg OD', color: 'bg-emerald-500' };
+                let dose = crcl > 50 ? "20 mg OD" : "15 mg OD";
+                return { status: 'เหมาะสม', dose: dose, color: 'bg-emerald-500' };
+            }
+
+            if (drug === 'edoxaban') {
+                if (crcl < 15) return { status: 'ไม่แนะนำ', dose: 'หลีกเลี่ยง', color: 'bg-rose-500' };
+                let dose = (weight <= 60 || crcl <= 49 || pgp) ? "30 mg OD" : "60 mg OD";
+                let remark = ind === 'VTE' ? "แนะนำ Heparin/enoxaparin 5-10 วัน ก่อนเริ่มยา" : "";
+                return { status: 'เหมาะสม', dose: dose, color: 'bg-emerald-500', remark: remark };
+            }
+
+            if (drug === 'apixaban') {
+                if (crcl < 15) return { status: 'ไม่แนะนำ', dose: 'หลีกเลี่ยง', color: 'bg-rose-500' };
+                if (ind === 'VTE') return { status: 'เหมาะสม', dose: '10 mg BID (7 วัน) → 5 mg BID', color: 'bg-emerald-500', remark: 'ไม่ต้องลดขนาดยาใน VTE' };
+                
+                let criteria = 0;
+                if (weight <= 60) criteria++;
+                if (age >= 80) criteria++;
+                if (scr >= 1.5) criteria++;
+
+                let dose = (crcl <= 29 || criteria >= 2) ? "2.5 mg BID" : "5 mg BID";
+                return { status: 'เหมาะสม', dose: dose, color: 'bg-emerald-500' };
+            }
+        }
+
+        function renderMainResult(res) {
+            const card = document.getElementById('main-recommendation');
+            card.className = `p-6 rounded-2xl mb-4 text-white ${res.color}`;
+            document.getElementById('final-status').innerText = res.status;
+            document.getElementById('final-dose').innerText = res.dose;
+            document.getElementById('final-remark').innerText = res.remark || "";
+        }
+
+        function renderAlternatives(currentDrug, ind, crcl, age, weight, scr, pgp, vera, antiplat, ng) {
+            const drugs = ['dabigatran', 'rivaroxaban', 'edoxaban', 'apixaban'];
+            const list = document.getElementById('alt-list');
+            list.innerHTML = "";
+
+            drugs.forEach(d => {
+                if(d === currentDrug) return;
+                const res = getDoseInfo(d, ind, crcl, age, weight, scr, pgp, vera, antiplat, ng);
+                if(res.status === 'เหมาะสม') {
+                    const div = document.createElement('div');
+                    div.className = "bg-slate-700/50 p-3 rounded-xl border border-slate-600";
+                    div.innerHTML = `<p class="text-xs font-bold uppercase text-indigo-300">${d}</p>
+                                     <p class="font-bold text-lg">${res.dose}</p>
+                                     <p class="text-xs opacity-70">${res.remark || ""}</p>`;
+                    list.appendChild(div);
+                }
+            });
+        }
+    </script>
 </body>
 </html>
