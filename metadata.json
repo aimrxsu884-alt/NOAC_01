@@ -1,0 +1,5 @@
+{
+  "name": "NOAC Smart Guard",
+  "description": "A clinical decision support tool for evaluating NOAC (Non-vitamin K Antagonist Oral Anticoagulant) dosage appropriateness based on patient parameters, CrCl, and drug interactions.",
+  "requestFramePermissions": []
+}
