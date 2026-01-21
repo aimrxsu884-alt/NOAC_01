@@ -1,6 +1,5 @@
-
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,31 +7,93 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-      body { 
-        font-family: 'Plus Jakarta Sans', sans-serif; 
-        font-size: 16px; /* Increased base font size */
-      }
-      .vibrant-gradient {
-        background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-      }
-      .glass-card {
-        background: rgba(255, 255, 255, 0.8);
-        backdrop-filter: blur(10px);
-      }
+      @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+      body { font-family: 'Sarabun', sans-serif; }
+      .vibrant-gradient { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); }
     </style>
-<script type="importmap">
-{
-  "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.38.0"
-  }
-}
-</script>
 </head>
-<body class="bg-indigo-50/50 text-slate-900 min-h-screen">
-    <div id="root"></div>
+<body class="bg-slate-50 min-h-screen pb-10">
+    <div class="max-w-md mx-auto p-4">
+        <header class="vibrant-gradient text-white p-6 rounded-3xl shadow-xl mb-6 text-center">
+            <h1 class="text-2xl font-bold">NOAC Smart Guard</h1>
+            <p class="text-sm opacity-80">ระบบช่วยตัดสินใจขนาดทางการแพทย์</p>
+        </header>
+
+        <div class="bg-white p-6 rounded-3xl shadow-md border border-indigo-50 mb-6">
+            <h2 class="font-bold mb-4 text-slate-700"><i class="fas fa-edit mr-2 text-indigo-500"></i>กรอกข้อมูลคนไข้</h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">ยาที่ใช้</label>
+                    <select id="drug" class="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <option value="dabigatran">Dabigatran</option>
+                        <option value="apixaban">Apixaban</option>
+                        <option value="rivaroxaban">Rivaroxaban</option>
+                        <option value="edoxaban">Edoxaban</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">CrCl (ml/min)</label>
+                    <input type="number" id="crcl" placeholder="เช่น 33.06" class="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <button onclick="calculate()" class="w-full vibrant-gradient text-white font-bold py-3 rounded-xl shadow-lg hover:opacity-90 transition">
+                    คำนวณขนาดที่แนะนำ
+                </button>
+            </div>
+        </div>
+
+        <div id="resultBox" class="hidden animate-bounce-in">
+            <div class="bg-white p-6 rounded-3xl shadow-md border border-indigo-50 text-center">
+                <p class="text-slate-400 text-sm mb-1">ผลการวิเคราะห์</p>
+                <div id="statusTag" class="inline-block px-4 py-1 rounded-full text-white font-bold text-sm mb-4"></div>
+                <h2 id="doseResult" class="text-3xl font-black text-slate-800 mb-2">-</h2>
+                <p id="remark" class="text-slate-500 text-sm italic"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function calculate() {
+            const drug = document.getElementById('drug').value;
+            const crcl = parseFloat(document.getElementById('crcl').value);
+            const resBox = document.getElementById('resultBox');
+            const doseText = document.getElementById('doseResult');
+            const statusTag = document.getElementById('statusTag');
+            const remark = document.getElementById('remark');
+
+            if (isNaN(crcl)) {
+                alert('กรุณากรอกค่า CrCl');
+                return;
+            }
+
+            resBox.classList.remove('hidden');
+            
+            // Logic คำนวณเบื้องต้น (สามารถปรับเปลี่ยนตามความต้องการได้)
+            if (drug === 'dabigatran') {
+                if (crcl >= 30) {
+                    showResult('เหมาะสม', '150 mg BID', 'bg-emerald-500', 'เฝ้าระวังอาการเลือดออก');
+                } else if (crcl >= 15) {
+                    showResult('ปรับลดขนาด', '75 mg BID', 'bg-amber-500', 'พิจารณาใช้ยาอื่นหากทำได้');
+                } else {
+                    showResult('ไม่แนะนำ', 'หลีกเลี่ยงการใช้', 'bg-rose-500', 'Contraindicated');
+                }
+            } else if (drug === 'apixaban') {
+                if (crcl >= 15) {
+                    showResult('เหมาะสม', '5 mg BID', 'bg-emerald-500', 'ตรวจสอบเกณฑ์ลดขนาดยาอื่นร่วมด้วย');
+                } else {
+                    showResult('ระมัดระวัง', '2.5 mg BID', 'bg-amber-500', 'ใช้ตามดุลพินิจของแพทย์');
+                }
+            }
+            // เพิ่ม Logic ยาตัวอื่นๆ ได้ตรงนี้
+        }
+
+        function showResult(status, dose, colorClass, note) {
+            const statusTag = document.getElementById('statusTag');
+            statusTag.innerText = status;
+            statusTag.className = `inline-block px-4 py-1 rounded-full text-white font-bold text-sm mb-4 ${colorClass}`;
+            document.getElementById('doseResult').innerText = dose;
+            document.getElementById('remark').innerText = note;
+        }
+    </script>
 </body>
 </html>
